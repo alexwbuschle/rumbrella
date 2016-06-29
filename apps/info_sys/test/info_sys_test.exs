@@ -16,7 +16,12 @@ defmodule InfoSysTest do
     end
 
     def fetch("timeout", _ref, owner, _limit) do
-      send(owner, {:backend, self()}) :timer.sleep(:infinity)
+      send(owner, {:backend, self()})
+      :timer.sleep(:infinity)
+    end
+
+    def fetch("boom", _ref, _owner, _limit) do
+      raise "boom!"
     end
   end
 
@@ -34,6 +39,13 @@ defmodule InfoSysTest do
     assert_receive {:backend, backend_pid}
     ref = Process.monitor(backend_pid)
     assert_receive {:DOWN, ^ref, :process, _pid, _reason}
+    refute_received {:DOWN, _, _, _, _}
+    refute_received :timedout
+  end
+
+  @tag :capture_log
+  test "compute/2 discards backend errors" do
+    assert InfoSys.compute("boom", backends: [TestBackend]) == []
     refute_received {:DOWN, _, _, _, _}
     refute_received :timedout
   end
